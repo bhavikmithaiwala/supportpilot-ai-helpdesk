@@ -41,13 +41,13 @@ export function attachSockets(server: HttpServer) {
               })
             : null;
         if (!auth || !ticket) {
-          ack?.(false);
+          if (typeof ack === 'function') ack(false);
           return;
         }
         socket.join(`ticket:${id}:${identity.role === 'customer' ? 'public' : 'staff'}`);
-        ack?.(true);
+        if (typeof ack === 'function') ack(true);
       } catch {
-        ack?.(false);
+        if (typeof ack === 'function') ack(false);
       }
     });
     socket.on('unsubscribe', (id: string) => {
@@ -65,7 +65,7 @@ export function attachSockets(server: HttpServer) {
     }
   }, 5000);
   timer.unref();
-  io.on('close', () => clearInterval(timer));
+  server.once('close', () => clearInterval(timer));
   return io;
 }
 export async function publish(io: Server, id: string, internal = false) {

@@ -8,7 +8,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DatePipe, JsonPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Api, Ticket, Message, errorText } from '../../core/api';
 interface Suggestion {
@@ -23,7 +23,7 @@ interface Suggestion {
 @Component({
   changeDetection: ChangeDetectionStrategy.Default,
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, JsonPipe, Attachments],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, Attachments],
   template: `<section class="page">
     <a routerLink="/tickets" class="back">← Back to inbox</a>
     @if (error) {
@@ -110,8 +110,8 @@ interface Suggestion {
                   ><span class="muted small"
                     >{{ event.actorId?.name }} · {{ event.createdAt | date: 'short' }}</span
                   >
-                  @if (event.after) {
-                    <pre>{{ event.after | json }}</pre>
+                  @for (change of eventChanges(event); track change) {
+                    <p class="muted small">{{ change }}</p>
                   }
                 </div>
               }
@@ -255,6 +255,27 @@ export class Detail implements OnDestroy {
   }
   label(s: string) {
     return s.replaceAll('_', ' ');
+  }
+  eventChanges(event: { before?: Record<string, unknown>; after?: Record<string, unknown> }) {
+    if (!event.after) return [];
+    const changes: string[] = [];
+    for (const key of ['status', 'category', 'priority', 'assignedAgentId']) {
+      const before = event.before?.[key];
+      const after = event.after[key];
+      if (before === after) continue;
+      const name = (value: unknown) =>
+        key === 'assignedAgentId'
+          ? value
+            ? this.agents.find((agent) => agent.id === String(value))?.name || 'Staff account'
+            : 'Unassigned'
+          : this.label(String(value || 'None'));
+      changes.push(
+        `${key === 'assignedAgentId' ? 'Assignment' : key[0]!.toUpperCase() + key.slice(1)}: ${name(before)} → ${name(after)}`,
+      );
+    }
+    if (event.after['reason']) changes.push(`Reason: ${event.after['reason']}`);
+    if (event.after['filename']) changes.push(`File: ${event.after['filename']}`);
+    return changes;
   }
   constructor() {
     effect(() => {

@@ -11,6 +11,10 @@ import { apiRouter } from './controllers/api.js';
 export function createApp(getIo: () => Server | undefined = () => undefined) {
   const app = express();
   app.disable('x-powered-by');
+  app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
   app.use(
     helmet(),
     cors({ origin: config.origin, credentials: true }),
@@ -19,11 +23,9 @@ export function createApp(getIo: () => Server | undefined = () => undefined) {
     originDefense,
   );
   app.get('/api/health', (_req, res) =>
-    res
-      .status(mongoose.connection.readyState === 1 ? 200 : 503)
-      .json({
-        data: { status: mongoose.connection.readyState === 1 ? 'ok' : 'database unavailable' },
-      }),
+    res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({
+      data: { status: mongoose.connection.readyState === 1 ? 'ok' : 'database unavailable' },
+    }),
   );
   app.use('/api', apiRouter(getIo));
   app.use((_req, res) => res.status(404).json({ error: { message: 'Route not found' } }));
@@ -39,21 +41,23 @@ export function createApp(getIo: () => Server | undefined = () => undefined) {
               ? 409
               : error.status === 413
                 ? 413
-                : 500;
-      res
-        .status(status)
-        .json({
-          error: {
-            message:
-              error instanceof ZodError
-                ? 'Invalid input'
-                : status === 500
-                  ? 'Service unavailable'
-                  : status === 409
-                    ? 'Conflict: refresh or check duplicate data'
+                : error.type === 'entity.parse.failed'
+                  ? 400
+                  : 500;
+      res.status(status).json({
+        error: {
+          message:
+            error instanceof ZodError
+              ? 'Invalid input'
+              : status === 500
+                ? 'Service unavailable'
+                : status === 409
+                  ? 'Conflict: refresh or check duplicate data'
+                  : error.type === 'entity.parse.failed'
+                    ? 'Invalid JSON'
                     : error.message,
-          },
-        });
+        },
+      });
     },
   );
   return app;

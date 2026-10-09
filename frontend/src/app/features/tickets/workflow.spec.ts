@@ -58,7 +58,7 @@ describe('conversation permissions and draft editing', () => {
     api.get.mockImplementation((path: string) =>
       Promise.resolve({
         data:
-          path.includes('/events') || path === '/staff'
+          path.includes('/events') || path.includes('/attachments') || path === '/staff'
             ? []
             : {
                 ticket,

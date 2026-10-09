@@ -5,6 +5,8 @@ import { hashPassword } from './middleware/security.js';
 import { createTicket, mutateTicket } from './services/tickets.js';
 import type { Identity } from './middleware/security.js';
 const password = process.env.SEED_PASSWORD;
+if (config.production)
+  throw new Error('Fictional demo seeding is disabled in production; use bootstrap-admin');
 if (!password || password.length < 12)
   throw new Error('Set SEED_PASSWORD to a local-only password with at least 12 characters');
 await mongoose.connect(config.mongo);

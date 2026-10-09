@@ -1,14 +1,10 @@
+import { analyticsSummary } from '../services/analytics.js';
+import { addAttachment } from '../services/attachments.js';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { config } from '../config/index.js';
-import {
-  ApiError,
-  requireAuth,
-  csrfDefense,
-  staff,
-  admin,
-} from '../middleware/security.js';
+import { ApiError, requireAuth, csrfDefense, staff, admin } from '../middleware/security.js';
 import {
   User,
   Session,
@@ -28,7 +24,12 @@ import { createTicket, visibleTicket, mutateTicket } from '../services/tickets.j
 import { suggestion } from '../services/triage.js';
 import type { Server } from 'socket.io';
 import { publish } from '../sockets/index.js';
-import { serializeUser, loginAccount, provisionAccount, changeAccess } from '../services/accounts.js';
+import {
+  serializeUser,
+  loginAccount,
+  provisionAccount,
+  changeAccess,
+} from '../services/accounts.js';
 const text = (max: number) => z.string().trim().min(1).max(max);
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ID');
 const version = z.number().int().nonnegative();
@@ -82,7 +83,7 @@ export function apiRouter(getIo: () => Server | undefined) {
         .object({ email: z.string().email().max(254), password: z.string().min(1).max(128) })
         .strict()
         .parse(req.body);
-      const {user,token,csrf}=await loginAccount(input.email,input.password);
+      const { user, token, csrf } = await loginAccount(input.email, input.password);
       res
         .cookie('sp_session', token, { ...cookieOptions, maxAge: 8 * 3600000 })
         .json({ data: { user, csrf } });
@@ -217,9 +218,6 @@ export function apiRouter(getIo: () => Server | undefined) {
     });
   });
   router.post('/tickets/:id/attachments', async (req, res) => {
-    const ticket = await visibleTicket(String(req.params.id), req.identity);
-    if (req.identity.role === 'customer' && ticket.status === 'closed')
-      throw new ApiError(409, 'Closed tickets are read only');
     const input = z
       .object({
         name: z.string().regex(/^[a-zA-Z0-9 _.-]{1,100}\.txt$/),
@@ -227,22 +225,9 @@ export function apiRouter(getIo: () => Server | undefined) {
       })
       .strict()
       .parse(req.body);
-    const bytes = Buffer.from(input.content, 'utf8');
-    if (bytes.length > 16384 || input.content.includes('\0'))
-      throw new ApiError(400, 'Only UTF-8 text up to 16 KiB is allowed');
-    if ((await Attachment.countDocuments({ ticketId: ticket._id })) >= 10)
-      throw new ApiError(409, 'Ticket attachment limit reached');
-    const attachment = await Attachment.create({
-      ticketId: ticket._id,
-      createdBy: req.identity.id,
-      name: input.name,
-      bytes,
-      size: bytes.length,
-    });
-    if (getIo()) await publish(getIo()!, String(ticket._id));
-    res
-      .status(201)
-      .json({ data: { _id: attachment._id, name: attachment.name, size: attachment.size } });
+    const attachment = await addAttachment(String(req.params.id), req.identity, input);
+    if (getIo()) await publish(getIo()!, String(req.params.id));
+    res.status(201).json({ data: attachment });
   });
   router.get('/attachments/:id', async (req, res) => {
     const id = objectId.parse(req.params.id);
@@ -300,62 +285,7 @@ export function apiRouter(getIo: () => Server | undefined) {
       .object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() })
       .strict()
       .parse(req.query);
-    if (q.from && q.to && q.from > q.to) throw new ApiError(400, 'Invalid date range');
-    const match: any = {};
-    if (q.from || q.to)
-      match.createdAt = {
-        ...(q.from ? { $gte: new Date(q.from) } : {}),
-        ...(q.to ? { $lte: new Date(q.to) } : {}),
-      };
-    const [result] = await Ticket.aggregate([
-      { $match: match },
-      {
-        $facet: {
-          statuses: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-          categories: [{ $group: { _id: '$category', count: { $sum: 1 } } }],
-          trends: [
-            {
-              $group: {
-                _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-                count: { $sum: 1 },
-              },
-            },
-            { $sort: { _id: 1 } },
-          ],
-          metrics: [
-            {
-              $group: {
-                _id: null,
-                total: { $sum: 1 },
-                firstResponseMs: {
-                  $avg: {
-                    $cond: [
-                      { $ne: ['$firstRespondedAt', null] },
-                      { $subtract: ['$firstRespondedAt', '$createdAt'] },
-                      null,
-                    ],
-                  },
-                },
-                resolutionMs: {
-                  $avg: {
-                    $cond: [
-                      { $ne: ['$resolvedAt', null] },
-                      { $subtract: ['$resolvedAt', '$createdAt'] },
-                      null,
-                    ],
-                  },
-                },
-                backlog: {
-                  $sum: {
-                    $cond: [{ $in: ['$status', ['new', 'open', 'waiting_on_customer']] }, 1, 0],
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    ]);
+    const result = await analyticsSummary(q);
     res.json({ data: result });
   });
   router.get('/reports/tickets.csv', staff, async (_req, res) => {
@@ -399,7 +329,7 @@ export function apiRouter(getIo: () => Server | undefined) {
       .strict()
       .refine((x) => Object.keys(x).length > 0)
       .parse(req.body);
-    const user=await changeAccess(id,req.identity.id,input);
+    const user = await changeAccess(id, req.identity.id, input);
     getIo()?.in(`user:${id}`).disconnectSockets(true);
     res.json({ data: user });
   });

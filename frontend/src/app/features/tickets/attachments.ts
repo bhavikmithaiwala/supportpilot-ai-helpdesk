@@ -4,7 +4,7 @@ import {
   Component,
   inject,
   input,
-  OnInit,
+  effect,
 } from '@angular/core';
 import { Api, errorText } from '../../core/api';
 @Component({
@@ -44,7 +44,7 @@ import { Api, errorText } from '../../core/api';
     }
   </section>`,
 })
-export class Attachments implements OnInit {
+export class Attachments {
   private cdr = inject(ChangeDetectorRef);
   api = inject(Api);
   ticketId = input.required<string>();
@@ -52,8 +52,11 @@ export class Attachments implements OnInit {
   files: { _id: string; name: string; size: number }[] = [];
   busy = false;
   error = '';
-  ngOnInit() {
-    void this.load();
+  constructor() {
+    effect(() => {
+      this.api.changed();
+      void this.load();
+    });
   }
   async load() {
     try {

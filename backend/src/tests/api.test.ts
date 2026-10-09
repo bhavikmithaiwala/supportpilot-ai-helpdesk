@@ -76,6 +76,15 @@ describe('real persistence and access boundaries', () => {
   let id: string;
   let currentVersion = 0;
   it('rejects missing auth, bad origin, CSRF and privilege injection', async () => {
+    expect(
+      (
+        await request(app)
+          .post('/api/auth/login')
+          .set('Origin', config.origin)
+          .set('Content-Type', 'application/json')
+          .send('{malformed')
+      ).status,
+    ).toBe(400);
     expect((await api('', 'get', '/tickets')).status).toBe(401);
     expect(
       (
@@ -294,6 +303,22 @@ describe('real persistence and access boundaries', () => {
     expect(downloaded.headers['content-disposition']).toContain('attachment');
     expect(downloaded.headers['x-content-type-options']).toBe('nosniff');
     expect((await api('c1', 'get', `/tickets/${id}/attachments`)).body.data).toHaveLength(1);
+    for (let i = 0; i < 8; i++)
+      expect(
+        (
+          await api('c1', 'post', `/tickets/${id}/attachments`, {
+            name: `evidence-${i}.txt`,
+            content: 'fictional',
+          })
+        ).status,
+      ).toBe(201);
+    const concurrent = await Promise.all([
+      api('c1', 'post', `/tickets/${id}/attachments`, { name: 'last-a.txt', content: 'a' }),
+      api('c1', 'post', `/tickets/${id}/attachments`, { name: 'last-b.txt', content: 'b' }),
+    ]);
+    expect(concurrent.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect((await api('c1', 'get', `/tickets/${id}/attachments`)).body.data).toHaveLength(10);
+    expect(await TicketEvent.countDocuments({ ticketId: id, type: 'attachment_added' })).toBe(10);
   });
   it('provisions accounts without returning password hashes and escapes CSV formulas', async () => {
     const created = await api('admin', 'post', '/users', {

@@ -1,4 +1,8 @@
 # Logs
+.angular/
+playwright-report/
+test-results/
+.mongodb/
 logs
 *.log
 npm-debug.log*

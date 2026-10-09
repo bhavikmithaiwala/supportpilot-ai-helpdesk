@@ -1,0 +1,17 @@
+# Engineering decisions
+
+1. **One Angular SPA and one Express process.** Standalone routed features, typed API envelopes, Reactive Forms, and a shared session service keep the client understandable. MongoDB is the authoritative source; dashboard charts never use hardcoded counts. Async operations explicitly mark views for checking on completion; signals represent shared identity and realtime invalidation. Browser verification exposed and prevented stale screens that manual component checks alone did not catch.
+
+2. **Opaque server sessions.** Random 256-bit session tokens are HttpOnly cookies; MongoDB stores only hashes. Every protected request verifies both expiration and active account status. Origin checks and synchronizer CSRF tokens protect mutations; same-origin proxying avoids ambiguous browser cookie deployment. Salted scrypt avoids plaintext passwords. Production requires HTTPS and a reverse proxy.
+
+3. **Transactions plus optimistic versions.** Ticket/message/event writes require a MongoDB replica set, including local Docker and ephemeral tests. They commit together. A supplied `__v` prevents lost agent updates; 409 asks the user to refresh. The ticket is the concurrency boundary. Append-only activity is enforced through exposed application operations, not against database administrators.
+
+4. **Invalidation instead of content broadcasts.** Socket payloads contain only ticket IDs. Each delivery rechecks authentication, role and customer ownership. Internal notes generate staff-only invalidations; REST re-applies visibility when fetching content. This costs a refresh request but makes privacy easier to inspect. Single-process sockets and IP throttling are appropriate locally; horizontal scaling would need shared rate-limit and socket adapters.
+
+5. **AI drafts have no send capability.** Local whole-word rules return explanations and possible competing categories, not calibrated probabilities. Billing takes precedence over technical, then account, then general; urgent/outage/service impact cues suggest high priority. Human choices always override. Drafts live in a separate TTL collection. Consent and server configuration gate Gemini; prompt minimization is heuristic and cannot guarantee removal of all PII. Structured output, bounded latency, plain-text rendering and local fallback handle untrusted results. Live Gemini is not required or exercised without user credentials.
+
+6. **Small safe attachment scope.** UTF-8 text files are persisted in MongoDB and downloaded through authorization checks. The 16 KiB cap keeps payloads under the JSON body ceiling and avoids a filesystem/object-storage dependency. Attachments are public ticket evidence. General binary uploads and malware scanning are intentionally outside this release.
+
+7. **Metric semantics are explicit.** First response counts only human staff public messages. Current resolution clears when reopened; closed tickets retain the last resolution. Backlog includes new/open/waiting. Overdue means no first response after a configurable creation-time threshold; it is not an enterprise SLA. UTC date buckets avoid implicit host-timezone dependence.
+
+8. **Roadmap grouped by working dependency boundaries.** The 60-step reference is retained. This implementation combines dependent schema/auth/service/API steps and UI workflows into fewer substantive commits. Commit count is reported truthfully; dates and existing history are preserved. Automated tests exercise actual MongoDB, HTTP cookies, sockets and browser flows.

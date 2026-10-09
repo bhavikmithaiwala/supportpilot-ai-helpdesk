@@ -29,3 +29,28 @@ Milestone 5 (`a0ea86e` frontend, `579ef04` verified backend): all 4 desktop/mobi
 Dependent steps were grouped into substantive commits; the original 60-step roadmap is preserved. No filler commits, fabricated dates or history rewrites.
 
 Limitations: no live Gemini verification without user credentials; Docker unavailable here (isolated real MongoDB verification succeeded); CI configured but remote result not yet observed; attachments limited to text, threads load in full, CSV capped at 10,000, single workspace/process with in-memory rate limits. No release-blocking local failures remain after the recorded fixes.
+
+## Release verification — 2026-10-09
+
+| Command | Actual result |
+|---|---|
+| `npm run build` | Angular production bundle and strict backend TypeScript build passed; Angular initial bundle 362.61 kB |
+| `npm run lint` | Passed, zero ESLint errors/warnings |
+| `npm run test -w backend` | 20 tests passed, real isolated MongoDB 8.0.12 replica set; final hardening rerun passed |
+| `npm run test -w frontend` | 6 Angular interaction tests passed |
+| `npm run e2e` | 4 Playwright journeys passed, desktop and mobile Chromium, final run 34.0 seconds |
+| `npm run format:check` | Passed |
+| `npm audit` | Zero vulnerabilities |
+| `npm ci` | Clean locked install passed: 720 packages installed, zero vulnerabilities |
+| `git diff --check` | Passed |
+
+Commits before release documentation:
+
+1. `82c3466` — workspace and reference baseline.
+2. `fe7f2b2` — backend API/auth/lifecycle/local suggestions.
+3. `579ef04` — real database/socket tests, dependencies and account services.
+4. `a0ea86e` — responsive Angular customer/staff/admin application.
+5. `b6162c5` — transactional attachment concurrency, bootstrap, readable timeline and final hardening.
+6. `d8f24de` — passing browser journeys, actual screenshots and CI.
+
+Release documentation is the seventh meaningful new commit after initial `d182841` (8 total commits once committed). Exact final hash is available from `git log -1`; no self-referential commit hash is embedded. `.vscode/` remains untouched and untracked. Remote history was fetched and is fast-forward compatible; final push outcome is reported after execution. Next task after release: inspect GitHub Actions result, then optionally configure a user-owned Gemini account if desired. Core local workflows need no external service configuration.

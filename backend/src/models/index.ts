@@ -1,20 +1,108 @@
 import mongoose, { Schema } from 'mongoose';
-export const roles = ['customer','agent','admin'] as const;
-export const statuses = ['new','open','waiting_on_customer','resolved','closed'] as const;
-export const categories = ['billing','technical','account','general','other'] as const;
-export const priorities = ['low','medium','high'] as const;
-const userSchema = new Schema({name:{type:String,required:true},email:{type:String,required:true,unique:true,lowercase:true,trim:true},passwordHash:{type:String,required:true,select:false},role:{type:String,enum:roles,required:true},active:{type:Boolean,default:true}}, {timestamps:true});
-export const User = mongoose.model('User',userSchema);
-export const Session = mongoose.model('Session',new Schema({tokenHash:{type:String,unique:true,required:true},userId:{type:Schema.Types.ObjectId,ref:'User',required:true},csrf:{type:String,required:true},expiresAt:{type:Date,required:true,index:{expires:0}}},{timestamps:true}));
-const ticketSchema = new Schema({ticketNumber:{type:String,unique:true,required:true},customerId:{type:Schema.Types.ObjectId,ref:'User',required:true},assignedAgentId:{type:Schema.Types.ObjectId,ref:'User',default:null},subject:{type:String,required:true},description:{type:String,required:true},category:{type:String,enum:categories,default:'general'},priority:{type:String,enum:priorities,default:'medium'},status:{type:String,enum:statuses,default:'new'},firstRespondedAt:{type:Date,default:null},resolvedAt:{type:Date,default:null},closedAt:{type:Date,default:null}}, {timestamps:true,optimisticConcurrency:true});
-ticketSchema.index({customerId:1,createdAt:-1}); ticketSchema.index({status:1,priority:1,updatedAt:-1}); ticketSchema.index({assignedAgentId:1,status:1});
-export const Ticket = mongoose.model('Ticket',ticketSchema);
-const messageSchema = new Schema({ticketId:{type:Schema.Types.ObjectId,ref:'Ticket',required:true},authorId:{type:Schema.Types.ObjectId,ref:'User',required:true},body:{type:String,required:true},visibility:{type:String,enum:['public','internal'],required:true},source:{type:String,enum:['human'],default:'human'}},{timestamps:true});
-messageSchema.index({ticketId:1,createdAt:1});
-export const Message = mongoose.model('Message',messageSchema);
-const eventSchema = new Schema({ticketId:{type:Schema.Types.ObjectId,required:true},actorId:{type:Schema.Types.ObjectId,ref:'User',required:true},type:{type:String,required:true},before:Schema.Types.Mixed,after:Schema.Types.Mixed},{timestamps:true});
-eventSchema.index({ticketId:1,createdAt:1});
-export const TicketEvent = mongoose.model('TicketEvent',eventSchema);
-export const Draft = mongoose.model('Draft',new Schema({ticketId:{type:Schema.Types.ObjectId,required:true},requestedBy:{type:Schema.Types.ObjectId,required:true},text:{type:String,required:true},provider:String,review:{type:String,enum:['pending','approved','rejected'],default:'pending'},createdAt:{type:Date,default:Date.now,index:{expires:604800}}}));
-export const ReadState = mongoose.model('ReadState',new Schema({userId:{type:Schema.Types.ObjectId,required:true},ticketId:{type:Schema.Types.ObjectId,required:true},readAt:{type:Date,required:true}}).index({userId:1,ticketId:1},{unique:true}));
-export const Settings = mongoose.model('Settings',new Schema({key:{type:String,unique:true},overdueHours:{type:Number,default:24}}));
+export const roles = ['customer', 'agent', 'admin'] as const;
+export const statuses = ['new', 'open', 'waiting_on_customer', 'resolved', 'closed'] as const;
+export const categories = ['billing', 'technical', 'account', 'general', 'other'] as const;
+export const priorities = ['low', 'medium', 'high'] as const;
+const userSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: roles, required: true },
+    active: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+export const User = mongoose.model('User', userSchema);
+export const Session = mongoose.model(
+  'Session',
+  new Schema(
+    {
+      tokenHash: { type: String, unique: true, required: true },
+      userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+      csrf: { type: String, required: true },
+      expiresAt: { type: Date, required: true, index: { expires: 0 } },
+    },
+    { timestamps: true },
+  ),
+);
+const ticketSchema = new Schema(
+  {
+    ticketNumber: { type: String, unique: true, required: true },
+    customerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    assignedAgentId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    subject: { type: String, required: true },
+    description: { type: String, required: true },
+    category: { type: String, enum: categories, default: 'general' },
+    priority: { type: String, enum: priorities, default: 'medium' },
+    status: { type: String, enum: statuses, default: 'new' },
+    firstRespondedAt: { type: Date, default: null },
+    resolvedAt: { type: Date, default: null },
+    closedAt: { type: Date, default: null },
+  },
+  { timestamps: true, optimisticConcurrency: true },
+);
+ticketSchema.index({ customerId: 1, createdAt: -1 });
+ticketSchema.index({ status: 1, priority: 1, updatedAt: -1 });
+ticketSchema.index({ assignedAgentId: 1, status: 1 });
+export const Ticket = mongoose.model('Ticket', ticketSchema);
+const messageSchema = new Schema(
+  {
+    ticketId: { type: Schema.Types.ObjectId, ref: 'Ticket', required: true },
+    authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    body: { type: String, required: true },
+    visibility: { type: String, enum: ['public', 'internal'], required: true },
+    source: { type: String, enum: ['human'], default: 'human' },
+  },
+  { timestamps: true },
+);
+messageSchema.index({ ticketId: 1, createdAt: 1 });
+export const Message = mongoose.model('Message', messageSchema);
+const eventSchema = new Schema(
+  {
+    ticketId: { type: Schema.Types.ObjectId, required: true },
+    actorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    type: { type: String, required: true },
+    before: Schema.Types.Mixed,
+    after: Schema.Types.Mixed,
+  },
+  { timestamps: true },
+);
+eventSchema.index({ ticketId: 1, createdAt: 1 });
+export const TicketEvent = mongoose.model('TicketEvent', eventSchema);
+export const Draft = mongoose.model(
+  'Draft',
+  new Schema({
+    ticketId: { type: Schema.Types.ObjectId, required: true },
+    requestedBy: { type: Schema.Types.ObjectId, required: true },
+    text: { type: String, required: true },
+    provider: String,
+    review: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    createdAt: { type: Date, default: Date.now, index: { expires: 604800 } },
+  }),
+);
+export const ReadState = mongoose.model(
+  'ReadState',
+  new Schema({
+    userId: { type: Schema.Types.ObjectId, required: true },
+    ticketId: { type: Schema.Types.ObjectId, required: true },
+    readAt: { type: Date, required: true },
+  }).index({ userId: 1, ticketId: 1 }, { unique: true }),
+);
+export const Settings = mongoose.model(
+  'Settings',
+  new Schema({ key: { type: String, unique: true }, overdueHours: { type: Number, default: 24 } }),
+);
+export const Attachment = mongoose.model(
+  'Attachment',
+  new Schema(
+    {
+      ticketId: { type: Schema.Types.ObjectId, required: true, index: true },
+      createdBy: { type: Schema.Types.ObjectId, required: true },
+      name: { type: String, required: true },
+      bytes: { type: Buffer, required: true, select: false },
+      size: { type: Number, required: true },
+    },
+    { timestamps: true },
+  ),
+);
